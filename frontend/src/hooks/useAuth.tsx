@@ -9,6 +9,7 @@ type AuthState = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateAvatar: (avatarUrl: string) => Promise<void>;
+  updateShareLocation: (shareLocation: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -45,8 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updated);
   }
 
+  async function updateShareLocation(shareLocation: boolean) {
+    const updated = await api.patch<User>("/users/me", { shareLocation });
+    setUser(updated);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signup, login, logout, updateAvatar }}>
+    <AuthContext.Provider value={{ user, isLoading, signup, login, logout, updateAvatar, updateShareLocation }}>
       {children}
     </AuthContext.Provider>
   );

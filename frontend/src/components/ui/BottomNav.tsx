@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { House, PlusCircle, ClockCounterClockwise } from "@phosphor-icons/react";
+import { House, PlusCircle, MapTrifold, ClockCounterClockwise } from "@phosphor-icons/react";
 import clsx from "clsx";
 import { useAuth } from "../../hooks/useAuth";
 import { Avatar } from "./Avatar";
@@ -7,6 +7,7 @@ import { Avatar } from "./Avatar";
 const ITEMS = [
   { to: "/", label: "Races", icon: House },
   { to: "/races/new", label: "Create", icon: PlusCircle },
+  { to: "/map", label: "Map", icon: MapTrifold },
   { to: "/history", label: "History", icon: ClockCounterClockwise },
 ];
 

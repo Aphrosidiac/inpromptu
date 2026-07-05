@@ -15,6 +15,7 @@ import { ProfilePage } from "./routes/ProfilePage";
 import { JoinRacePage } from "./routes/JoinRacePage";
 import { GaragePage } from "./routes/GaragePage";
 import { CarFormPage } from "./routes/CarFormPage";
+import { MapPage } from "./routes/MapPage";
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
               <Route element={<AppShell />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/races/new" element={<CreateRacePage />} />
+                <Route path="/map" element={<MapPage />} />
                 <Route path="/history" element={<RaceHistoryPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
               </Route>

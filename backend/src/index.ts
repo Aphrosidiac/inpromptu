@@ -9,9 +9,11 @@ import userRoutes from "./routes/users";
 import uploadRoutes from "./routes/uploads";
 import carRoutes from "./routes/cars";
 import { verifyAccessToken } from "./lib/jwt";
+import { getPrismaClient } from "./db/client";
 import type { Env } from "./env";
 
 export { RaceRoomAgent } from "./agents/RaceRoomAgent";
+export { NearbyAgent } from "./agents/NearbyAgent";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -81,6 +83,45 @@ app.get("/api/races/:raceId/live", async (c) => {
   });
 
   const agent = await getAgentByName(c.env.RACE_ROOM, c.req.param("raceId"));
+  return agent.fetch(authedRequest);
+});
+
+// Ambient "nearby players" map, outside of any specific race. A single global NearbyAgent
+// instance -- every opted-in user connects here. shareLocation is checked server-side (not
+// just trusted from the client) so a user who hasn't consented can never end up broadcasting
+// their position just because the frontend happened to call this.
+app.get("/api/nearby/live", async (c) => {
+  const token = getCookie(c, "inpromptu_access");
+  if (!token) return c.json({ success: false, message: "Unauthorized" }, 401);
+  let userId: string;
+  try {
+    userId = await verifyAccessToken(token, c.env.JWT_ACCESS_SECRET);
+  } catch {
+    return c.json({ success: false, message: "Unauthorized" }, 401);
+  }
+
+  const prisma = getPrismaClient(c.env);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { cars: { where: { isActive: true }, take: 1 } },
+  });
+  if (!user) return c.json({ success: false, message: "Unauthorized" }, 401);
+  if (!user.shareLocation) {
+    return c.json({ success: false, message: "Location sharing is not enabled" }, 403);
+  }
+
+  const url = new URL(c.req.raw.url);
+  url.searchParams.set("userId", userId);
+  url.searchParams.set("displayName", user.displayName);
+  const carPhotoUrl = user.cars[0]?.photoUrl;
+  if (carPhotoUrl) url.searchParams.set("carPhotoUrl", carPhotoUrl);
+
+  const authedRequest = new Request(url.toString(), {
+    method: c.req.raw.method,
+    headers: c.req.raw.headers,
+  });
+
+  const agent = await getAgentByName(c.env.NEARBY, "global");
   return agent.fetch(authedRequest);
 });
 

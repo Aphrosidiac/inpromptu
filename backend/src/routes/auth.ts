@@ -13,8 +13,20 @@ import type { Env } from "../env";
 
 const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
 
-function serializeUser(user: { id: string; email: string; displayName: string; avatarUrl: string | null }) {
-  return { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl };
+function serializeUser(user: {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+  shareLocation: boolean;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    shareLocation: user.shareLocation,
+  };
 }
 
 function normalizeEmail(email: string) {

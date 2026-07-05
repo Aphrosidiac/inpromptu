@@ -83,3 +83,18 @@ export type RaceRoomState = {
   raceDeadlineAt: number | null;
   racers: Record<string, RacerLiveState>;
 };
+
+// Mirrors backend/src/agents/NearbyAgent.ts NearbyUserState/NearbyRoomState.
+export type NearbyUserState = {
+  userId: string;
+  displayName: string;
+  carPhotoUrl?: string;
+  lat: number;
+  lng: number;
+  speedKmh: number;
+  lastUpdateAt: number;
+};
+
+export type NearbyRoomState = {
+  users: Record<string, NearbyUserState>;
+};

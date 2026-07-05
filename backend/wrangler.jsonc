@@ -7,11 +7,13 @@
 
   "durable_objects": {
     "bindings": [
-      { "name": "RACE_ROOM", "class_name": "RaceRoomAgent" }
+      { "name": "RACE_ROOM", "class_name": "RaceRoomAgent" },
+      { "name": "NEARBY", "class_name": "NearbyAgent" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["RaceRoomAgent"] }
+    { "tag": "v1", "new_sqlite_classes": ["RaceRoomAgent"] },
+    { "tag": "v2", "new_sqlite_classes": ["NearbyAgent"] }
   ],
 
   "r2_buckets": [

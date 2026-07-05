@@ -3,4 +3,5 @@ export type User = {
   email: string;
   displayName: string;
   avatarUrl: string | null;
+  shareLocation: boolean;
 };
