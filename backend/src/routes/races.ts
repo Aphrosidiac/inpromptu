@@ -235,9 +235,8 @@ app.post("/:raceId/start", requireAuth, async (c) => {
   const race = await prisma.race.findUnique({ where: { id: raceId }, include: { participants: true } });
   if (!race) return c.json({ success: false, message: "Race not found" }, 404);
   if (race.hostId !== userId) return c.json({ success: false, message: "Only the host can start the race" }, 403);
-  if (race.participants.length < 2) {
-    return c.json({ success: false, message: "Need at least 2 racers to start" }, 409);
-  }
+  // Solo starts are allowed -- the frontend confirms with the host first ("start alone?")
+  // rather than the server hard-blocking it.
 
   // Atomic compare-and-swap: two concurrent /start calls (double-tap, retried request) would
   // otherwise both read status="LOBBY" and both kick off the DO's countdown. Only the request

@@ -5,10 +5,12 @@ import { useAuth } from "../hooks/useAuth";
 import { useRaceRoomAgent } from "../hooks/useRaceRoomAgent";
 import { useToast } from "../components/ui/Toast";
 import { racesApi } from "../lib/races";
+import { ApiError } from "../lib/api";
 import { GlassCard } from "../components/ui/GlassCard";
 import { PageFade } from "../components/ui/PageFade";
 import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
+import { BottomSheet } from "../components/ui/BottomSheet";
 import { LeafletMap } from "../components/map/LeafletMap";
 import { RouteLine } from "../components/map/RouteLine";
 import type { Race } from "../types/race";
@@ -28,6 +30,8 @@ export function RaceLobbyPage() {
   const [race, setRace] = useState<Race | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSoloConfirm, setShowSoloConfirm] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const seenRacers = useRef<Set<string> | null>(null);
 
   const { state } = useRaceRoomAgent(raceId!, user!.id);
@@ -56,13 +60,27 @@ export function RaceLobbyPage() {
     }
   }, [state?.status, raceId, navigate]);
 
-  async function handleStart() {
+  async function startRace() {
     setError(null);
+    setIsStarting(true);
     try {
       await racesApi.start(raceId!);
-    } catch {
-      setError("Could not start the race");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not start the race");
+    } finally {
+      setIsStarting(false);
+      setShowSoloConfirm(false);
     }
+  }
+
+  function handleStartClick() {
+    const racers = state ? Object.values(state.racers) : [];
+    const racerCount = racers.length || (race?.participants.length ?? 0);
+    if (racerCount < 2) {
+      setShowSoloConfirm(true);
+      return;
+    }
+    startRace();
   }
 
   async function handleShare() {
@@ -147,12 +165,26 @@ export function RaceLobbyPage() {
       <div className="flex-1" />
 
       {isHost ? (
-        <Button size="lg" fullWidth onClick={handleStart} className="mb-4">
+        <Button size="lg" fullWidth onClick={handleStartClick} className="mb-4">
           Start race
         </Button>
       ) : (
         <p className="mb-6 text-center text-[14px] text-text-muted">Waiting for the host to start the race...</p>
       )}
+
+      <BottomSheet open={showSoloConfirm} onClose={() => setShowSoloConfirm(false)} title="Start race alone?">
+        <p className="mb-5 text-[14px] text-text-muted">
+          No one else has joined yet. You can still start and race solo against the clock.
+        </p>
+        <div className="flex gap-3">
+          <Button variant="glass" fullWidth onClick={() => setShowSoloConfirm(false)}>
+            Cancel
+          </Button>
+          <Button fullWidth disabled={isStarting} onClick={startRace}>
+            {isStarting ? "Starting..." : "Start alone"}
+          </Button>
+        </div>
+      </BottomSheet>
     </PageFade>
   );
 }
