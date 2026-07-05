@@ -113,7 +113,20 @@ function LiveNearbyMap() {
   if (geoError) {
     return (
       <div className="safe-top flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-8 text-center">
-        <p className="text-text-muted">Couldn't get your location: {geoError}</p>
+        {geoError.permissionDenied ? (
+          <>
+            <p className="text-text-muted">
+              Location access is blocked for this site in your browser. Sharing won't work until
+              you allow it.
+            </p>
+            <p className="text-[13px] text-text-muted">
+              Open your browser's site settings for inpromptu.lewix.ai (usually the icon next to
+              the address bar) and set Location to Allow, then reload this page.
+            </p>
+          </>
+        ) : (
+          <p className="text-text-muted">Couldn't get your location: {geoError.message}</p>
+        )}
         <Button variant="glass" disabled={isDisabling} onClick={handleDisable}>
           Turn off sharing
         </Button>

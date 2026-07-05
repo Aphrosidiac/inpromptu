@@ -6,10 +6,12 @@ type Sample = { lat: number; lng: number; t: number };
 const SAMPLE_HISTORY_SIZE = 5;
 const MIN_SAMPLE_INTERVAL_MS = 500;
 
+export type GeolocationError = { message: string; permissionDenied: boolean };
+
 export function useGeolocation(enabled: boolean) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [speedKmh, setSpeedKmh] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<GeolocationError | null>(null);
   const history = useRef<Sample[]>([]);
   const lastSampleAt = useRef(0);
 
@@ -43,7 +45,7 @@ export function useGeolocation(enabled: boolean) {
           if (speeds.length) setSpeedKmh(speeds.reduce((sum, s) => sum + s, 0) / speeds.length);
         }
       },
-      (err) => setError(err.message),
+      (err) => setError({ message: err.message, permissionDenied: err.code === err.PERMISSION_DENIED }),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
     );
 
