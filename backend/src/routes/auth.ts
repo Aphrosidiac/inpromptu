@@ -7,6 +7,8 @@ import { signAccessToken } from "../lib/jwt";
 import { issueRefreshToken, rotateRefreshToken, revokeRefreshToken } from "../lib/refreshTokens";
 import { setAuthCookies, clearAuthCookies, REFRESH_COOKIE } from "../lib/cookies";
 import { requireAuth } from "../middleware/requireAuth";
+import { checkRateLimit } from "../lib/rateLimit";
+import { Prisma } from "../generated/prisma/client.js";
 import type { Env } from "../env";
 
 const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
@@ -15,9 +17,22 @@ function serializeUser(user: { id: string; email: string; displayName: string; a
   return { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl };
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+// bcrypt silently truncates input beyond 72 bytes -- without this cap, two different
+// passwords sharing the first 72 bytes would hash identically and both would authenticate.
+const MAX_PASSWORD_BYTES = 72;
+
 const SignupSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z
+    .string()
+    .min(8)
+    .refine((pw) => new TextEncoder().encode(pw).length <= MAX_PASSWORD_BYTES, {
+      message: "Password is too long",
+    }),
   displayName: z.string().min(1).max(50),
 });
 
@@ -27,16 +42,30 @@ const LoginSchema = z.object({
 });
 
 app.post("/signup", async (c) => {
+  if (!(await checkRateLimit(c, "signup"))) {
+    return c.json({ success: false, message: "Too many attempts, try again shortly" }, 429);
+  }
   const parsed = SignupSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ success: false, message: "Invalid input" }, 400);
-  const { email, password, displayName } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
+  const { password, displayName } = parsed.data;
 
   const prisma = getPrismaClient(c.env);
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return c.json({ success: false, message: "Email already in use" }, 409);
 
   const passwordHash = await hashPassword(password);
-  const user = await prisma.user.create({ data: { email, passwordHash, displayName } });
+  let user;
+  try {
+    user = await prisma.user.create({ data: { email, passwordHash, displayName } });
+  } catch (err) {
+    // Two concurrent signups with the same email both pass the findUnique check above --
+    // the DB's unique constraint is the real guard, so a race here surfaces as P2002.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return c.json({ success: false, message: "Email already in use" }, 409);
+    }
+    throw err;
+  }
 
   const accessToken = await signAccessToken(user.id, c.env.JWT_ACCESS_SECRET);
   const refreshToken = await issueRefreshToken(prisma, user.id);
@@ -46,9 +75,13 @@ app.post("/signup", async (c) => {
 });
 
 app.post("/login", async (c) => {
+  if (!(await checkRateLimit(c, "login"))) {
+    return c.json({ success: false, message: "Too many attempts, try again shortly" }, 429);
+  }
   const parsed = LoginSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ success: false, message: "Invalid input" }, 400);
-  const { email, password } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
+  const { password } = parsed.data;
 
   const prisma = getPrismaClient(c.env);
   const user = await prisma.user.findUnique({ where: { email } });
@@ -64,6 +97,9 @@ app.post("/login", async (c) => {
 });
 
 app.post("/refresh", async (c) => {
+  if (!(await checkRateLimit(c, "refresh"))) {
+    return c.json({ success: false, message: "Too many attempts, try again shortly" }, 429);
+  }
   const raw = getCookie(c, REFRESH_COOKIE);
   if (!raw) return c.json({ success: false, message: "No refresh token" }, 401);
 

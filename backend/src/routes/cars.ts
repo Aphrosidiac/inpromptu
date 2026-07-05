@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getPrismaClient } from "../db/client";
 import { requireAuth } from "../middleware/requireAuth";
+import { deleteR2Image } from "../lib/r2Images";
+import { Prisma } from "../generated/prisma/client.js";
 import type { Env } from "../env";
 
 const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
@@ -37,12 +39,29 @@ app.post("/", requireAuth, async (c) => {
   const userId = c.get("userId");
   const prisma = getPrismaClient(c.env);
 
-  const existingCount = await prisma.car.count({ where: { userId } });
-  const car = await prisma.car.create({
-    data: { ...parsed.data, userId, isActive: existingCount === 0 },
-  });
-
-  return c.json({ success: true, data: car }, 201);
+  // count() then create() isn't atomic under Read Committed -- two concurrent creates could
+  // both read count=0 and both end up isActive:true, violating "exactly one active car per
+  // user". Serializable isolation makes Postgres detect that read-write conflict and fail one
+  // side with a retriable serialization error instead of silently allowing two active cars.
+  try {
+    const car = await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.car.create({ data: { ...parsed.data, userId, isActive: false } });
+        const activeCount = await tx.car.count({ where: { userId, isActive: true } });
+        if (activeCount === 0) {
+          return tx.car.update({ where: { id: created.id }, data: { isActive: true } });
+        }
+        return created;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+    return c.json({ success: true, data: car }, 201);
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+      return c.json({ success: false, message: "Please try again" }, 409);
+    }
+    throw err;
+  }
 });
 
 app.patch("/:carId", requireAuth, async (c) => {
@@ -54,6 +73,12 @@ app.patch("/:carId", requireAuth, async (c) => {
   if (!car || car.userId !== c.get("userId")) return c.json({ success: false, message: "Car not found" }, 404);
 
   const updated = await prisma.car.update({ where: { id: car.id }, data: parsed.data });
+
+  // Replacing the cover photo previously left the old R2 object permanently orphaned.
+  if (parsed.data.photoUrl !== undefined && car.photoUrl && car.photoUrl !== parsed.data.photoUrl) {
+    await deleteR2Image(c.env.UPLOADS, car.photoUrl);
+  }
+
   return c.json({ success: true, data: updated });
 });
 
@@ -63,6 +88,7 @@ app.delete("/:carId", requireAuth, async (c) => {
   if (!car || car.userId !== c.get("userId")) return c.json({ success: false, message: "Car not found" }, 404);
 
   await prisma.car.delete({ where: { id: car.id } });
+  await deleteR2Image(c.env.UPLOADS, car.photoUrl);
   return c.json({ success: true });
 });
 

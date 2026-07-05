@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getPrismaClient } from "../db/client";
 import { requireAuth } from "../middleware/requireAuth";
+import { deleteR2Image } from "../lib/r2Images";
 import type { Env } from "../env";
 
 const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
@@ -11,10 +12,17 @@ app.patch("/me", requireAuth, async (c) => {
   if (!parsed.success) return c.json({ success: false, message: "Invalid input" }, 400);
 
   const prisma = getPrismaClient(c.env);
+  const previous = await prisma.user.findUnique({ where: { id: c.get("userId") } });
   const user = await prisma.user.update({
     where: { id: c.get("userId") },
     data: { avatarUrl: parsed.data.avatarUrl },
   });
+
+  // Replacing the avatar previously left the old R2 object permanently orphaned.
+  if (previous?.avatarUrl && previous.avatarUrl !== parsed.data.avatarUrl) {
+    await deleteR2Image(c.env.UPLOADS, previous.avatarUrl);
+  }
+
   return c.json({ success: true, data: { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl } });
 });
 

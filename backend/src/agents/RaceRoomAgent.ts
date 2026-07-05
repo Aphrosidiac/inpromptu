@@ -163,11 +163,26 @@ export class RaceRoomAgent extends Agent<Env, RaceRoomState> {
 
   onConnect(conn: Connection, ctx: ConnectionContext) {
     const userId = new URL(ctx.request.url).searchParams.get("userId");
-    if (!userId || !this.state.racers[userId]) {
+    const racer = userId ? this.state.racers[userId] : undefined;
+    if (!userId || !racer) {
       conn.close(4001, "Unknown participant");
       return;
     }
     conn.serializeAttachment({ userId });
+
+    // A dropped-and-reconnected racer was marked DISCONNECTED by onClose. Without clearing it
+    // here, they'd stay counted as "done" for the all-finished check until their next position
+    // update happens to arrive -- which could let the race finalize early while they're still
+    // actually connected and racing.
+    if (racer.status === "DISCONNECTED") {
+      this.setState({
+        ...this.state,
+        racers: {
+          ...this.state.racers,
+          [userId]: { ...racer, status: this.state.status === "ACTIVE" ? "RACING" : "LOBBY" },
+        },
+      });
+    }
   }
 
   onClose(conn: Connection) {
@@ -192,7 +207,22 @@ export class RaceRoomAgent extends Agent<Env, RaceRoomState> {
       return;
     }
     if (msg.type !== "POSITION_UPDATE" || this.state.status !== "ACTIVE") return;
-    if (typeof msg.lat !== "number" || typeof msg.lng !== "number") return;
+    // typeof NaN === "number", so a bare typeof check lets NaN through -- and since NaN is
+    // contagious through addition, one bad sample would permanently poison distanceTraveled
+    // for the rest of the race. Bounds-check too, since a wild lat/lng degrades silently
+    // (no exception) rather than crashing.
+    if (
+      typeof msg.lat !== "number" ||
+      typeof msg.lng !== "number" ||
+      !Number.isFinite(msg.lat) ||
+      !Number.isFinite(msg.lng) ||
+      msg.lat < -90 ||
+      msg.lat > 90 ||
+      msg.lng < -180 ||
+      msg.lng > 180
+    ) {
+      return;
+    }
 
     const attachment = conn.deserializeAttachment() as { userId?: string } | null;
     const userId = attachment?.userId;
@@ -202,7 +232,7 @@ export class RaceRoomAgent extends Agent<Env, RaceRoomState> {
     if (!racer || racer.status === "FINISHED") return;
 
     const { lat, lng } = msg;
-    const speedKmh = typeof msg.speedKmh === "number" ? msg.speedKmh : 0;
+    const speedKmh = typeof msg.speedKmh === "number" && Number.isFinite(msg.speedKmh) && msg.speedKmh >= 0 ? msg.speedKmh : 0;
 
     const distToFinish = haversineMeters(lat, lng, this.state.endLat, this.state.endLng);
     const stepDistance = haversineMeters(racer.lat, racer.lng, lat, lng);
