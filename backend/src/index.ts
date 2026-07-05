@@ -15,10 +15,20 @@ export { RaceRoomAgent } from "./agents/RaceRoomAgent";
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Cloudflare Pages serves every deployment at its own <hash>.inpromptu.pages.dev URL in
+// addition to the canonical alias -- both the CORS config and the CSRF check below need to
+// recognize those, or every preview/deployment-specific link (which get shared/bookmarked
+// constantly during development) silently breaks all mutating requests, including login itself.
+function isAllowedOrigin(origin: string | undefined, env: Env): boolean {
+  if (!origin) return false;
+  if (origin === env.FRONTEND_ORIGIN) return true;
+  return /^https:\/\/[a-z0-9-]+\.inpromptu\.pages\.dev$/.test(origin);
+}
+
 app.use(
   "*",
   cors({
-    origin: (_origin, c) => c.env.FRONTEND_ORIGIN,
+    origin: (origin, c) => (isAllowedOrigin(origin, c.env) ? origin : c.env.FRONTEND_ORIGIN),
     credentials: true,
   })
 );
@@ -32,7 +42,7 @@ app.use(
 app.use("*", async (c, next) => {
   const method = c.req.method;
   if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-    if (c.req.header("Origin") !== c.env.FRONTEND_ORIGIN) {
+    if (!isAllowedOrigin(c.req.header("Origin"), c.env)) {
       return c.json({ success: false, message: "Forbidden" }, 403);
     }
   }
