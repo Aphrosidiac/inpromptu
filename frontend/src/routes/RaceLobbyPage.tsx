@@ -9,7 +9,16 @@ import { GlassCard } from "../components/ui/GlassCard";
 import { PageFade } from "../components/ui/PageFade";
 import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
+import { LeafletMap } from "../components/map/LeafletMap";
+import { RouteLine } from "../components/map/RouteLine";
 import type { Race } from "../types/race";
+
+function previewZoomFor(distanceMeters: number) {
+  if (distanceMeters < 1000) return 15;
+  if (distanceMeters < 3000) return 14;
+  if (distanceMeters < 6000) return 13;
+  return 12;
+}
 
 export function RaceLobbyPage() {
   const { raceId } = useParams<{ raceId: string }>();
@@ -86,7 +95,17 @@ export function RaceLobbyPage() {
       </div>
       {error && <p className="mt-2 text-[13px] text-danger">{error}</p>}
 
-      <GlassCard className="mt-5">
+      <div className="mt-4 overflow-hidden rounded-card">
+        <LeafletMap
+          center={{ lat: (race.startLat + race.endLat) / 2, lng: (race.startLng + race.endLng) / 2 }}
+          zoom={previewZoomFor(race.distanceMeters)}
+          height="200px"
+        >
+          <RouteLine waypoints={race.waypoints} />
+        </LeafletMap>
+      </div>
+
+      <GlassCard className="mt-4">
         <div className="mb-3 flex items-center gap-2 text-[13px] font-medium text-text-muted">
           <Users size={16} />
           Racers ({racers.length || race.participants.length})

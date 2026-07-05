@@ -9,4 +9,5 @@ export interface Env {
   FRONTEND_ORIGIN: string;
   JWT_ACCESS_SECRET: string;
   REFRESH_TOKEN_HASH_SECRET: string;
+  ORS_API_KEY: string;
 }

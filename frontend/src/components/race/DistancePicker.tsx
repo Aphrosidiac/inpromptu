@@ -7,7 +7,7 @@ export function DistancePicker({ distanceMeters, onChange }: DistancePickerProps
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <span className="text-[13px] font-medium text-text-muted">Distance</span>
+        <span className="text-[13px] font-medium text-text-muted">Target distance</span>
         <span className="font-mono text-2xl font-semibold text-accent">
           {(distanceMeters / 1000).toFixed(1)}
           <span className="ml-1 text-sm text-text-muted">km</span>
@@ -27,6 +27,9 @@ export function DistancePicker({ distanceMeters, onChange }: DistancePickerProps
         <span>1 km</span>
         <span>10 km</span>
       </div>
+      <p className="text-[12px] text-text-muted">
+        The route follows real roads, so the actual distance may vary a little from your target.
+      </p>
     </div>
   );
 }

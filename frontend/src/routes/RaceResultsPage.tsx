@@ -4,6 +4,7 @@ import { Trophy } from "@phosphor-icons/react";
 import { useAuth } from "../hooks/useAuth";
 import { useRaceRoomAgent } from "../hooks/useRaceRoomAgent";
 import { racesApi } from "../lib/races";
+import { racersToLiveResults } from "../lib/liveResults";
 import { LeaderboardTable } from "../components/race/LeaderboardTable";
 import { Confetti } from "../components/race/Confetti";
 import { Button } from "../components/ui/Button";
@@ -45,30 +46,7 @@ export function RaceResultsPage() {
 
   if (!race) return <div className="safe-top flex min-h-[100dvh] items-center justify-center text-text-muted">Loading...</div>;
 
-  const liveResults: RaceResult[] = state
-    ? Object.values(state.racers)
-        .slice()
-        .sort((a, b) => {
-          if (a.status === "FINISHED" && b.status === "FINISHED") return (a.rank ?? 0) - (b.rank ?? 0);
-          if (a.status === "FINISHED") return -1;
-          if (b.status === "FINISHED") return 1;
-          return b.distanceTraveled - a.distanceTraveled;
-        })
-        .map((r) => ({
-          id: r.userId,
-          raceId: race.id,
-          participantId: r.userId,
-          userId: r.userId,
-          finishedAt: r.finishedAt ? new Date(r.finishedAt).toISOString() : null,
-          elapsedMs: r.elapsedMs ?? null,
-          rank: r.rank ?? null,
-          didNotFinish: false,
-          finalDistanceMeters: r.distanceTraveled,
-          averageSpeedKmh: null,
-          participant: { user: { id: r.userId, displayName: r.displayName } },
-        }))
-    : [];
-
+  const liveResults: RaceResult[] = state ? racersToLiveResults(Object.values(state.racers), race.id) : [];
   const finalResults = results ?? liveResults;
   const myResult = finalResults.find((r) => r.userId === user?.id);
   const isWinner = myResult?.rank === 1;

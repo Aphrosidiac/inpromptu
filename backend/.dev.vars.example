@@ -1,3 +1,4 @@
 # Copy to .dev.vars for local `wrangler dev`. Never commit the real .dev.vars.
 JWT_ACCESS_SECRET="dev-only-change-me-access"
 REFRESH_TOKEN_HASH_SECRET="dev-only-change-me-refresh"
+ORS_API_KEY="get-a-free-key-at-openrouteservice.org"

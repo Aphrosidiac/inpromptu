@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getPrismaClient } from "../db/client";
 import { requireAuth } from "../middleware/requireAuth";
-import { haversineMeters } from "../lib/haversine";
-import { generateRandomRoute } from "../lib/randomRoute";
+import { pickRandomDestination } from "../lib/randomRoute";
+import { getDrivingRoute, RoutingError } from "../lib/routing";
 import { getAgentByName } from "agents";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { Env } from "../env";
@@ -47,24 +47,36 @@ app.post("/", requireAuth, async (c) => {
     waypoints: Prisma.InputJsonValue,
     distanceMeters: number;
 
-  if (body.mode === "RANDOM_ROUTE") {
-    const route = generateRandomRoute(body.originLat, body.originLng, body.distanceMeters);
-    startLat = route.start.lat;
-    startLng = route.start.lng;
-    endLat = route.end.lat;
-    endLng = route.end.lng;
-    waypoints = route.waypoints;
-    distanceMeters = body.distanceMeters;
-  } else {
-    startLat = body.startLat;
-    startLng = body.startLng;
-    endLat = body.endLat;
-    endLng = body.endLng;
-    waypoints = [
-      { lat: body.startLat, lng: body.startLng },
-      { lat: body.endLat, lng: body.endLng },
-    ];
-    distanceMeters = Math.round(haversineMeters(body.startLat, body.startLng, body.endLat, body.endLng));
+  try {
+    if (body.mode === "RANDOM_ROUTE") {
+      const destination = pickRandomDestination(body.originLat, body.originLng, body.distanceMeters);
+      const route = await getDrivingRoute(c.env.ORS_API_KEY, [
+        { lat: body.originLat, lng: body.originLng },
+        destination,
+      ]);
+      startLat = body.originLat;
+      startLng = body.originLng;
+      endLat = destination.lat;
+      endLng = destination.lng;
+      waypoints = route.waypoints;
+      distanceMeters = route.distanceMeters;
+    } else {
+      const route = await getDrivingRoute(c.env.ORS_API_KEY, [
+        { lat: body.startLat, lng: body.startLng },
+        { lat: body.endLat, lng: body.endLng },
+      ]);
+      startLat = body.startLat;
+      startLng = body.startLng;
+      endLat = body.endLat;
+      endLng = body.endLng;
+      waypoints = route.waypoints;
+      distanceMeters = route.distanceMeters;
+    }
+  } catch (err) {
+    if (err instanceof RoutingError) {
+      return c.json({ success: false, message: "Could not calculate a route between those points" }, 502);
+    }
+    throw err;
   }
 
   const race = await prisma.race.create({

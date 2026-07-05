@@ -25,28 +25,17 @@ function destinationPoint(lat: number, lng: number, bearingDeg: number, distance
   return { lat: toDeg(lat2), lng: toDeg(lng2) };
 }
 
-// Generates a straight-line-ish route: picks a random bearing from the origin, walks
-// `distanceMeters` along it to get the end point, and adds a couple of intermediate
-// waypoints jittered slightly off the straight line so it isn't a perfectly straight arrow.
-// Deliberately NOT road-following (no routing engine) per the product requirements.
-export function generateRandomRoute(originLat: number, originLng: number, distanceMeters: number) {
+// Real roads wind, so a straight-line distance of X typically produces a road route noticeably
+// longer than X. Aiming the candidate destination at a fraction of the requested distance
+// gets the resulting *road* distance (computed afterwards by the actual routing engine) into
+// the right neighborhood -- it's an approximation, not exact, since we don't know the local
+// road layout in advance.
+const STRAIGHT_LINE_FUDGE_FACTOR = 0.75;
+
+// Picks a random destination point roughly `targetDistanceMeters` away from the origin, to be
+// handed to the real routing engine (getDrivingRoute) for an actual road route. Deliberately
+// does not attempt to hit the target distance exactly -- see fudge factor note above.
+export function pickRandomDestination(originLat: number, originLng: number, targetDistanceMeters: number): LatLng {
   const bearingDeg = Math.random() * 360;
-  const end = destinationPoint(originLat, originLng, bearingDeg, distanceMeters);
-
-  const waypoints: LatLng[] = [{ lat: originLat, lng: originLng }];
-
-  const segments = distanceMeters > 3000 ? 2 : 1;
-  for (let i = 1; i <= segments; i++) {
-    const fraction = i / (segments + 1);
-    const alongLat = originLat + (end.lat - originLat) * fraction;
-    const alongLng = originLng + (end.lng - originLng) * fraction;
-    const jitterBearing = bearingDeg + (Math.random() > 0.5 ? 90 : -90);
-    const jitterMeters = Math.min(distanceMeters * 0.05, 150);
-    const jittered = destinationPoint(alongLat, alongLng, jitterBearing, Math.random() * jitterMeters);
-    waypoints.push(jittered);
-  }
-
-  waypoints.push(end);
-
-  return { start: { lat: originLat, lng: originLng }, end, waypoints };
+  return destinationPoint(originLat, originLng, bearingDeg, targetDistanceMeters * STRAIGHT_LINE_FUDGE_FACTOR);
 }
