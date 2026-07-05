@@ -97,9 +97,12 @@ app.post("/login", async (c) => {
 });
 
 app.post("/refresh", async (c) => {
-  if (!(await checkRateLimit(c, "refresh"))) {
-    return c.json({ success: false, message: "Too many attempts, try again shortly" }, 429);
-  }
+  // Deliberately not rate-limited: this endpoint fires automatically and invisibly on the
+  // client whenever any request hits an expired access token, so normal use (multiple tabs,
+  // quick navigation) can burn through a request budget fast -- and a 429 here gets treated
+  // as "logged out" client-side, which would silently kick out an otherwise-valid session.
+  // Rate limiting also buys nothing security-wise here: replaying a stolen refresh token is
+  // already caught by rotation + reuse-detection regardless of how fast it's attempted.
   const raw = getCookie(c, REFRESH_COOKIE);
   if (!raw) return c.json({ success: false, message: "No refresh token" }, 401);
 
