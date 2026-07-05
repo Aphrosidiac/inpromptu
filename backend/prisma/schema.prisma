@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "cloudflare"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RaceMode {
+  RANDOM_ROUTE
+  PIN_DROP
+}
+
+enum RaceStatus {
+  DRAFT
+  LOBBY
+  COUNTDOWN
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+enum ParticipantStatus {
+  JOINED
+  READY
+  RACING
+  FINISHED
+  DISCONNECTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  displayName  String   @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  hostedRaces   Race[]            @relation("RaceHost")
+  participants  RaceParticipant[]
+  refreshTokens RefreshToken[]
+  cars          Car[]
+
+  @@map("users")
+}
+
+model Car {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  name             String
+  make             String?
+  model            String?
+  year             Int?
+  color            String?
+  photoUrl         String?  @map("photo_url")
+  engineType       String?  @map("engine_type")
+  drivetrain       String?
+  horsepowerHp     Int?     @map("horsepower_hp")
+  torqueNm         Int?     @map("torque_nm")
+  weightKg         Int?     @map("weight_kg")
+  topSpeedKmh      Int?     @map("top_speed_kmh")
+  zeroToHundredSec Float?   @map("zero_to_hundred_sec")
+  isActive         Boolean  @default(false) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("cars")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by")
+  expiresAt  DateTime  @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Race {
+  id                 String     @id @default(cuid())
+  hostId             String     @map("host_id")
+  mode               RaceMode
+  status             RaceStatus @default(DRAFT)
+  name               String
+  distanceMeters     Int        @map("distance_meters")
+  startLat           Float      @map("start_lat")
+  startLng           Float      @map("start_lng")
+  endLat             Float      @map("end_lat")
+  endLng             Float      @map("end_lng")
+  waypoints          Json       @default("[]") @map("waypoints")
+  finishRadiusMeters Int        @default(25) @map("finish_radius_meters")
+  timeoutSeconds     Int?       @map("timeout_seconds")
+  countdownStartedAt DateTime?  @map("countdown_started_at")
+  raceStartedAt      DateTime?  @map("race_started_at")
+  raceEndedAt        DateTime?  @map("race_ended_at")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  host         User              @relation("RaceHost", fields: [hostId], references: [id], onDelete: Cascade)
+  participants RaceParticipant[]
+  results      RaceResult[]
+
+  @@index([hostId])
+  @@index([status])
+  @@map("races")
+}
+
+model RaceParticipant {
+  id       String            @id @default(cuid())
+  raceId   String            @map("race_id")
+  userId   String            @map("user_id")
+  status   ParticipantStatus @default(JOINED)
+  joinedAt DateTime          @default(now()) @map("joined_at")
+
+  race   Race        @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  result RaceResult?
+
+  @@unique([raceId, userId])
+  @@index([raceId])
+  @@index([userId])
+  @@map("race_participants")
+}
+
+model RaceResult {
+  id                  String    @id @default(cuid())
+  raceId              String    @map("race_id")
+  participantId       String    @unique @map("participant_id")
+  userId              String    @map("user_id")
+  finishedAt          DateTime? @map("finished_at")
+  elapsedMs           Int?      @map("elapsed_ms")
+  rank                Int?
+  didNotFinish        Boolean   @default(false) @map("did_not_finish")
+  finalDistanceMeters Float     @map("final_distance_meters")
+  averageSpeedKmh     Float?    @map("average_speed_kmh")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  race        Race            @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  participant RaceParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([raceId])
+  @@index([userId])
+  @@map("race_results")
+}

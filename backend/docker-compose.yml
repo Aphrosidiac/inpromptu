@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: inpromptu-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inpromptu_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - inpromptu_pg_data:/var/lib/postgresql/data
+
+volumes:
+  inpromptu_pg_data:

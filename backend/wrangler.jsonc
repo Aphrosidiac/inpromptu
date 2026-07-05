@@ -1,0 +1,39 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "inpromptu-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "RACE_ROOM", "class_name": "RaceRoomAgent" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RaceRoomAgent"] }
+  ],
+
+  "r2_buckets": [
+    { "binding": "UPLOADS", "bucket_name": "inpromptu-uploads" }
+  ],
+
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "placeholder-hyperdrive-id",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5437/inpromptu_dev"
+    }
+  ],
+
+  "dev": {
+    "port": 8788
+  },
+
+  "vars": {
+    "ENVIRONMENT": "development",
+    "FRONTEND_ORIGIN": "http://localhost:5201"
+  },
+
+  "observability": { "enabled": true }
+}
