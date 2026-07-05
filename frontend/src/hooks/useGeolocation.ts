@@ -4,7 +4,7 @@ import { haversineMeters } from "../lib/haversine";
 type Sample = { lat: number; lng: number; t: number };
 
 const SAMPLE_HISTORY_SIZE = 5;
-const MIN_SAMPLE_INTERVAL_MS = 1000;
+const MIN_SAMPLE_INTERVAL_MS = 500;
 
 export function useGeolocation(enabled: boolean) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);

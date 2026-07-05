@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapTrifold } from "@phosphor-icons/react";
 import { useAuth } from "../hooks/useAuth";
@@ -16,6 +16,12 @@ import type { Race } from "../types/race";
 // always fire cleanly (backgrounded tab, network drop, killed app), so without this a user who
 // vanished ungracefully would appear frozen on the map forever.
 const STALE_MS = 2 * 60 * 1000;
+
+// Mobile connections drop and reconnect constantly (network switches, screen lock,
+// backgrounding). A reconnect looks identical to a brand-new connection server-side, so unless
+// this client proactively re-announces itself, it stays invisible to everyone else until the
+// next GPS fix happens to arrive -- which may not be soon if the device is stationary.
+const HEARTBEAT_MS = 3000;
 
 export function MapPage() {
   const { user } = useAuth();
@@ -72,15 +78,28 @@ function ShareLocationPrompt() {
 }
 
 function LiveNearbyMap() {
-  const { updateShareLocation } = useAuth();
+  const { user, updateShareLocation } = useAuth();
   const { position, speedKmh, error: geoError } = useGeolocation(true);
   const heading = useHeading(position?.lat, position?.lng);
   const { state, sendPosition } = useNearbyAgent();
   const [isDisabling, setIsDisabling] = useState(false);
+  const latestSample = useRef({ position, speedKmh });
+  latestSample.current = { position, speedKmh };
 
   useEffect(() => {
     if (position) sendPosition(position.lat, position.lng, speedKmh);
   }, [position, speedKmh, sendPosition]);
+
+  // Heartbeat: re-send the latest known position on a fixed cadence, not just when a fresh GPS
+  // fix arrives, so a reconnected WebSocket re-announces this client immediately instead of
+  // waiting on the next fix (which may be a while if the device is stationary).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const { position: pos, speedKmh: speed } = latestSample.current;
+      if (pos) sendPosition(pos.lat, pos.lng, speed);
+    }, HEARTBEAT_MS);
+    return () => clearInterval(interval);
+  }, [sendPosition]);
 
   async function handleDisable() {
     setIsDisabling(true);
@@ -110,7 +129,9 @@ function LiveNearbyMap() {
   }
 
   const now = Date.now();
-  const nearbyUsers = state ? Object.values(state.users).filter((u) => now - u.lastUpdateAt < STALE_MS) : [];
+  const nearbyUsers = state
+    ? Object.values(state.users).filter((u) => u.userId !== user?.id && now - u.lastUpdateAt < STALE_MS)
+    : [];
 
   return (
     <div className="relative min-h-[100dvh]">
