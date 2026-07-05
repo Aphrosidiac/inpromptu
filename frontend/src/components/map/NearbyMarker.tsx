@@ -24,10 +24,12 @@ function createAvatarIcon(user: NearbyUserState) {
 
 // Another opted-in user spotted on the ambient map (not in a race with you) -- same visual
 // language as RacerMarker, but a neutral ring since there's no race status to color-code.
-export function NearbyMarker({ user }: { user: NearbyUserState }) {
+// Tapping/clicking the marker opens their full profile (stats + garage); the tooltip stays as
+// a lightweight hover hint on desktop.
+export function NearbyMarker({ user, onClick }: { user: NearbyUserState; onClick: (userId: string) => void }) {
   const icon = createAvatarIcon(user);
   return (
-    <Marker position={[user.lat, user.lng]} icon={icon}>
+    <Marker position={[user.lat, user.lng]} icon={icon} eventHandlers={{ click: () => onClick(user.userId) }}>
       <Tooltip direction="top" offset={[0, -SIZE / 2]}>
         {user.displayName} · {user.speedKmh.toFixed(1)} km/h
       </Tooltip>

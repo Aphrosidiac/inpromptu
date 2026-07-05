@@ -9,6 +9,7 @@ import { racesApi } from "../lib/races";
 import { LeafletMap } from "../components/map/LeafletMap";
 import { MeMarker } from "../components/map/MeMarker";
 import { NearbyMarker } from "../components/map/NearbyMarker";
+import { RacerProfileModal } from "../components/race/RacerProfileModal";
 import { Button } from "../components/ui/Button";
 import type { Race } from "../types/race";
 
@@ -83,6 +84,7 @@ function LiveNearbyMap() {
   const heading = useHeading(position?.lat, position?.lng);
   const { state, sendPosition } = useNearbyAgent();
   const [isDisabling, setIsDisabling] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const latestSample = useRef({ position, speedKmh });
   latestSample.current = { position, speedKmh };
 
@@ -150,10 +152,12 @@ function LiveNearbyMap() {
     <div className="relative min-h-[100dvh]">
       <LeafletMap center={position} zoom={15} height="100dvh">
         {nearbyUsers.map((u) => (
-          <NearbyMarker key={u.userId} user={u} />
+          <NearbyMarker key={u.userId} user={u} onClick={setSelectedUserId} />
         ))}
         <MeMarker lat={position.lat} lng={position.lng} heading={heading} />
       </LeafletMap>
+
+      <RacerProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
 
       <div className="glass safe-top fixed inset-x-4 top-4 z-[1000] flex items-center justify-between rounded-card px-4 py-3">
         <span className="text-[13px] text-text-muted">

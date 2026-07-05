@@ -42,10 +42,7 @@ app.patch("/me", requireAuth, async (c) => {
   return c.json({ success: true, data: serializeUser(user) });
 });
 
-app.get("/me/stats", requireAuth, async (c) => {
-  const userId = c.get("userId");
-  const prisma = getPrismaClient(c.env);
-
+async function computeStats(prisma: ReturnType<typeof getPrismaClient>, userId: string) {
   const [racesJoined, results] = await Promise.all([
     prisma.raceParticipant.count({ where: { userId } }),
     prisma.raceResult.findMany({ where: { userId } }),
@@ -54,20 +51,50 @@ app.get("/me/stats", requireAuth, async (c) => {
   const finished = results.filter((r) => !r.didNotFinish);
   const wins = finished.filter((r) => r.rank === 1).length;
   const bestElapsedMs = finished.length ? Math.min(...finished.map((r) => r.elapsedMs ?? Infinity)) : null;
-  const bestSpeedKmh = finished.length
-    ? Math.max(...finished.map((r) => r.averageSpeedKmh ?? 0))
-    : null;
+  const bestSpeedKmh = finished.length ? Math.max(...finished.map((r) => r.averageSpeedKmh ?? 0)) : null;
   const totalDistanceKm = results.reduce((sum, r) => sum + r.finalDistanceMeters, 0) / 1000;
+
+  return {
+    racesJoined,
+    racesFinished: finished.length,
+    wins,
+    bestElapsedMs: bestElapsedMs === Infinity ? null : bestElapsedMs,
+    bestSpeedKmh,
+    totalDistanceKm,
+  };
+}
+
+app.get("/me/stats", requireAuth, async (c) => {
+  const prisma = getPrismaClient(c.env);
+  const stats = await computeStats(prisma, c.get("userId"));
+  return c.json({ success: true, data: stats });
+});
+
+// Public-ish profile card for another user -- shown when tapping their marker on the live map
+// or a racer in a shared race. Anyone who's already visible to other users via the nearby map
+// or a race lobby is fine surfacing this (display name, avatar, race stats, garage); it's the
+// same category of info already shown elsewhere, just gathered into one view. Never includes
+// email or anything else account-sensitive.
+app.get("/:userId/profile", requireAuth, async (c) => {
+  const userId = c.req.param("userId");
+  const prisma = getPrismaClient(c.env);
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return c.json({ success: false, message: "User not found" }, 404);
+
+  const [stats, cars] = await Promise.all([
+    computeStats(prisma, userId),
+    prisma.car.findMany({ where: { userId }, orderBy: [{ isActive: "desc" }, { createdAt: "desc" }] }),
+  ]);
 
   return c.json({
     success: true,
     data: {
-      racesJoined,
-      racesFinished: finished.length,
-      wins,
-      bestElapsedMs: bestElapsedMs === Infinity ? null : bestElapsedMs,
-      bestSpeedKmh,
-      totalDistanceKm,
+      id: user.id,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      stats,
+      cars,
     },
   });
 });
