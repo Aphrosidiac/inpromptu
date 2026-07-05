@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { CaretLeft, Camera, CheckCircle, Trash } from "@phosphor-icons/react";
 import clsx from "clsx";
 import { carsApi } from "../lib/cars";
-import { uploadImage, resolveImageUrl } from "../lib/api";
+import { uploadImage, resolveImageUrl, ApiError } from "../lib/api";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { GlassCard } from "../components/ui/GlassCard";
@@ -27,27 +27,30 @@ export function CarFormPage() {
 
   useEffect(() => {
     if (!carId) return;
-    carsApi.list().then((cars) => {
-      const found = cars.find((c) => c.id === carId);
-      if (found) {
-        setCar(found);
-        setPhotoUrl(found.photoUrl ?? undefined);
-        setForm({
-          name: found.name,
-          make: found.make ?? undefined,
-          model: found.model ?? undefined,
-          year: found.year ?? undefined,
-          color: found.color ?? undefined,
-          engineType: found.engineType ?? undefined,
-          drivetrain: found.drivetrain ?? undefined,
-          horsepowerHp: found.horsepowerHp ?? undefined,
-          torqueNm: found.torqueNm ?? undefined,
-          weightKg: found.weightKg ?? undefined,
-          topSpeedKmh: found.topSpeedKmh ?? undefined,
-          zeroToHundredSec: found.zeroToHundredSec ?? undefined,
-        });
-      }
-    });
+    carsApi
+      .list()
+      .then((cars) => {
+        const found = cars.find((c) => c.id === carId);
+        if (found) {
+          setCar(found);
+          setPhotoUrl(found.photoUrl ?? undefined);
+          setForm({
+            name: found.name,
+            make: found.make ?? undefined,
+            model: found.model ?? undefined,
+            year: found.year ?? undefined,
+            color: found.color ?? undefined,
+            engineType: found.engineType ?? undefined,
+            drivetrain: found.drivetrain ?? undefined,
+            horsepowerHp: found.horsepowerHp ?? undefined,
+            torqueNm: found.torqueNm ?? undefined,
+            weightKg: found.weightKg ?? undefined,
+            topSpeedKmh: found.topSpeedKmh ?? undefined,
+            zeroToHundredSec: found.zeroToHundredSec ?? undefined,
+          });
+        }
+      })
+      .catch(() => setError("Could not load this car's details"));
   }, [carId]);
 
   function field<K extends keyof CarInput>(key: K, value: string) {
@@ -70,9 +73,12 @@ export function CarFormPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploadingPhoto(true);
+    setError(null);
     try {
       const { url } = await uploadImage(file);
       setPhotoUrl(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not upload photo");
     } finally {
       setIsUploadingPhoto(false);
       e.target.value = "";
@@ -94,8 +100,8 @@ export function CarFormPage() {
         await carsApi.create(payload);
       }
       navigate("/garage");
-    } catch {
-      setError("Could not save this car");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save this car");
     } finally {
       setIsSaving(false);
     }
@@ -103,14 +109,24 @@ export function CarFormPage() {
 
   async function handleActivate() {
     if (!carId) return;
-    await carsApi.activate(carId);
-    navigate("/garage");
+    setError(null);
+    try {
+      await carsApi.activate(carId);
+      navigate("/garage");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not activate this car");
+    }
   }
 
   async function handleDelete() {
     if (!carId) return;
-    await carsApi.remove(carId);
-    navigate("/garage");
+    setError(null);
+    try {
+      await carsApi.remove(carId);
+      navigate("/garage");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not delete this car");
+    }
   }
 
   return (

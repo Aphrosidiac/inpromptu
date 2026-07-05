@@ -17,7 +17,7 @@ import {
 import clsx from "clsx";
 import { useAuth } from "../hooks/useAuth";
 import { usersApi, type UserStats } from "../lib/users";
-import { uploadImage } from "../lib/api";
+import { uploadImage, ApiError } from "../lib/api";
 import { GlassCard } from "../components/ui/GlassCard";
 import { Button } from "../components/ui/Button";
 import { StatCard } from "../components/ui/StatCard";
@@ -45,6 +45,7 @@ export function ProfilePage() {
   const { user, logout, updateAvatar } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -55,9 +56,12 @@ export function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
+    setError(null);
     try {
       const { url } = await uploadImage(file);
       await updateAvatar(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not update photo");
     } finally {
       setIsUploading(false);
       e.target.value = "";
@@ -67,6 +71,7 @@ export function ProfilePage() {
   return (
     <div className="safe-top flex flex-col gap-5 px-5 pt-6">
       <h1 className="text-2xl font-semibold text-text">Profile</h1>
+      {error && <p className="text-[13px] text-danger">{error}</p>}
 
       <GlassCard className="flex items-center gap-4">
         <button

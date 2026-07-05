@@ -69,10 +69,16 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
-export async function uploadImage(file: File): Promise<{ url: string }> {
+export async function uploadImage(file: File, isRetry = false): Promise<{ url: string }> {
   const formData = new FormData();
   formData.append("file", file);
   const res = await fetch(`${API_URL}/uploads`, { method: "POST", credentials: "include", body: formData });
+
+  if (res.status === 401 && !isRetry) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) return uploadImage(file, true);
+  }
+
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, body?.message ?? "Upload failed");
   return body.data;
