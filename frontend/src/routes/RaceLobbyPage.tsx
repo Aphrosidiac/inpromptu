@@ -26,6 +26,7 @@ export function RaceLobbyPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [race, setRace] = useState<Race | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seenRacers = useRef<Set<string> | null>(null);
 
@@ -33,7 +34,7 @@ export function RaceLobbyPage() {
 
   useEffect(() => {
     if (!raceId) return;
-    racesApi.get(raceId).then(setRace);
+    racesApi.get(raceId).then(setRace).catch(() => setLoadFailed(true));
   }, [raceId]);
 
   useEffect(() => {
@@ -74,6 +75,14 @@ export function RaceLobbyPage() {
     }
   }
 
+  if (loadFailed) {
+    return (
+      <div className="safe-top flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-5 text-center">
+        <p className="text-text-muted">Couldn't load this race. Check your connection and try again.</p>
+        <Button onClick={() => navigate("/")}>Back to races</Button>
+      </div>
+    );
+  }
   if (!race) return <div className="safe-top flex min-h-[100dvh] items-center justify-center text-text-muted">Loading...</div>;
 
   const isHost = race.hostId === user?.id;

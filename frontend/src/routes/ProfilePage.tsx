@@ -48,7 +48,7 @@ export function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    usersApi.stats().then(setStats);
+    usersApi.stats().then(setStats).catch(() => {});
   }, []);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {

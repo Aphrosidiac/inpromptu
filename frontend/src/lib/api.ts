@@ -21,12 +21,36 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// Concurrent 401s must share one refresh attempt -- the refresh token rotates on use, so
+// firing it multiple times in parallel would trip reuse detection and log the user out.
+let refreshPromise: Promise<boolean> | null = null;
+
+function refreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_URL}/auth/refresh`, { method: "POST", credentials: "include" })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: { "Content-Type": "application/json", ...options.headers },
   });
+
+  // The access token is short-lived (20min) -- a 401 here usually just means it expired
+  // mid-session, not that the user is actually logged out. Silently refresh and retry once
+  // before giving up, so callers don't need to handle this themselves.
+  if (res.status === 401 && !isRetry && path !== "/auth/refresh" && path !== "/auth/login") {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) return request<T>(path, options, true);
+  }
 
   const body = await res.json().catch(() => null);
 

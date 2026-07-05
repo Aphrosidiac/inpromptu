@@ -7,6 +7,7 @@ import { useGeolocation } from "../hooks/useGeolocation";
 import { useWakeLock } from "../hooks/useWakeLock";
 import { useHeading } from "../hooks/useHeading";
 import { useToast } from "../components/ui/Toast";
+import { Button } from "../components/ui/Button";
 import { racesApi } from "../lib/races";
 import { computeBearing } from "../lib/bearing";
 import { haversineMeters } from "../lib/haversine";
@@ -25,6 +26,7 @@ export function LiveRacePage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [race, setRace] = useState<Race | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const handleEvent = useCallback(
     (event: RaceRoomEvent) => {
@@ -44,7 +46,7 @@ export function LiveRacePage() {
 
   useEffect(() => {
     if (!raceId) return;
-    racesApi.get(raceId).then(setRace);
+    racesApi.get(raceId).then(setRace).catch(() => setLoadFailed(true));
   }, [raceId]);
 
   useEffect(() => {
@@ -61,6 +63,14 @@ export function LiveRacePage() {
     if (isActive && position) sendPosition(position.lat, position.lng, speedKmh);
   }, [isActive, position, speedKmh, sendPosition]);
 
+  if (loadFailed) {
+    return (
+      <div className="safe-top flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-5 text-center">
+        <p className="text-text-muted">Couldn't load this race. Check your connection and try again.</p>
+        <Button onClick={() => navigate("/")}>Back to races</Button>
+      </div>
+    );
+  }
   if (!race || !state) return <div className="safe-top flex min-h-[100dvh] items-center justify-center text-text-muted">Loading...</div>;
 
   const otherRacers = Object.values(state.racers).filter((r) => r.userId !== user?.id);

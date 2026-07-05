@@ -23,7 +23,7 @@ export function DashboardPage() {
   const [races, setRaces] = useState<Race[] | null>(null);
 
   useEffect(() => {
-    racesApi.list().then(setRaces);
+    racesApi.list().then(setRaces).catch(() => setRaces([]));
   }, []);
 
   async function handleOpen(race: Race) {

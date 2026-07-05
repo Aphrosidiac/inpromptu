@@ -13,7 +13,7 @@ export function RaceHistoryPage() {
   const [history, setHistory] = useState<{ race: Race; result: RaceResult | null }[] | null>(null);
 
   useEffect(() => {
-    racesApi.history().then(setHistory);
+    racesApi.history().then(setHistory).catch(() => setHistory([]));
   }, []);
 
   return (

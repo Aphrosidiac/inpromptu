@@ -16,6 +16,7 @@ export function RaceResultsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [race, setRace] = useState<Race | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [results, setResults] = useState<RaceResult[] | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const hasCelebrated = useRef(false);
@@ -24,12 +25,12 @@ export function RaceResultsPage() {
 
   useEffect(() => {
     if (!raceId) return;
-    racesApi.get(raceId).then(setRace);
+    racesApi.get(raceId).then(setRace).catch(() => setLoadFailed(true));
   }, [raceId]);
 
   useEffect(() => {
     if (race?.status === "FINISHED") {
-      racesApi.results(raceId!).then(setResults);
+      racesApi.results(raceId!).then(setResults).catch(() => setResults([]));
     }
   }, [race?.status, raceId]);
 
@@ -44,6 +45,14 @@ export function RaceResultsPage() {
     }
   }, [results, user?.id]);
 
+  if (loadFailed) {
+    return (
+      <div className="safe-top flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-5 text-center">
+        <p className="text-text-muted">Couldn't load this race. Check your connection and try again.</p>
+        <Button onClick={() => navigate("/")}>Back to races</Button>
+      </div>
+    );
+  }
   if (!race) return <div className="safe-top flex min-h-[100dvh] items-center justify-center text-text-muted">Loading...</div>;
 
   const liveResults: RaceResult[] = state ? racersToLiveResults(Object.values(state.racers), race.id) : [];

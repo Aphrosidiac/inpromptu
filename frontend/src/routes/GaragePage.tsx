@@ -14,7 +14,7 @@ export function GaragePage() {
   const [cars, setCars] = useState<Car[] | null>(null);
 
   useEffect(() => {
-    carsApi.list().then(setCars);
+    carsApi.list().then(setCars).catch(() => setCars([]));
   }, []);
 
   return (

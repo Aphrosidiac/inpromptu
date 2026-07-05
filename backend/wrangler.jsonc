@@ -21,7 +21,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "placeholder-hyperdrive-id",
+      "id": "5f2278d977a142d4b6a1d1c03ae10c95",
       "localConnectionString": "postgres://postgres:postgres@localhost:5437/inpromptu_dev"
     }
   ],
