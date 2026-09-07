@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { X } from "@phosphor-icons/react";
+import { X, Crosshair } from "@phosphor-icons/react";
 import { useAuth } from "../hooks/useAuth";
 import { useRaceRoomAgent, type RaceRoomEvent } from "../hooks/useRaceRoomAgent";
 import { useGeolocation } from "../hooks/useGeolocation";
@@ -15,6 +15,7 @@ import { LeafletMap } from "../components/map/LeafletMap";
 import { RouteLine } from "../components/map/RouteLine";
 import { RacerMarker } from "../components/map/RacerMarker";
 import { MeMarker } from "../components/map/MeMarker";
+import { FollowMe } from "../components/map/FollowMe";
 import { CountdownOverlay } from "../components/race/CountdownOverlay";
 import { LiveRaceSheet } from "../components/race/LiveRaceSheet";
 import { TopInstructionBar } from "../components/race/TopInstructionBar";
@@ -43,6 +44,8 @@ export function LiveRacePage() {
   const heading = useHeading(position?.lat, position?.lng);
   useWakeLock(isActive);
   const [now, setNow] = useState(() => Date.now());
+  const [following, setFollowing] = useState(true);
+  const [recenterSignal, setRecenterSignal] = useState(0);
 
   useEffect(() => {
     if (!raceId) return;
@@ -91,6 +94,9 @@ export function LiveRacePage() {
           <RacerMarker key={r.userId} racer={r} />
         ))}
         {isActive && position && <MeMarker lat={position.lat} lng={position.lng} heading={heading} />}
+        {isActive && position && (
+          <FollowMe position={position} recenterSignal={recenterSignal} onFollowingChange={setFollowing} />
+        )}
       </LeafletMap>
 
       {isActive && distanceToFinish != null && (
@@ -104,6 +110,16 @@ export function LiveRacePage() {
       >
         <X size={20} />
       </button>
+
+      {isActive && !following && (
+        <button
+          onClick={() => setRecenterSignal((n) => n + 1)}
+          aria-label="Recenter on my location"
+          className="glass safe-top fixed right-4 top-20 z-[1100] flex h-11 w-11 items-center justify-center rounded-full text-accent"
+        >
+          <Crosshair size={20} weight="bold" />
+        </button>
+      )}
       {isActive && (
         <LiveRaceSheet
           raceId={raceId!}

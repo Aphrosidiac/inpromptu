@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapTrifold } from "@phosphor-icons/react";
+import { MapTrifold, Crosshair } from "@phosphor-icons/react";
 import { useAuth } from "../hooks/useAuth";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useHeading } from "../hooks/useHeading";
@@ -9,6 +9,7 @@ import { racesApi } from "../lib/races";
 import { LeafletMap } from "../components/map/LeafletMap";
 import { MeMarker } from "../components/map/MeMarker";
 import { NearbyMarker } from "../components/map/NearbyMarker";
+import { FollowMe } from "../components/map/FollowMe";
 import { RacerProfileModal } from "../components/race/RacerProfileModal";
 import { Button } from "../components/ui/Button";
 import type { Race } from "../types/race";
@@ -85,6 +86,8 @@ function LiveNearbyMap() {
   const { state, sendPosition } = useNearbyAgent();
   const [isDisabling, setIsDisabling] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [following, setFollowing] = useState(true);
+  const [recenterSignal, setRecenterSignal] = useState(0);
   const latestSample = useRef({ position, speedKmh });
   latestSample.current = { position, speedKmh };
 
@@ -155,6 +158,7 @@ function LiveNearbyMap() {
           <NearbyMarker key={u.userId} user={u} onClick={setSelectedUserId} />
         ))}
         <MeMarker lat={position.lat} lng={position.lng} heading={heading} />
+        <FollowMe position={position} recenterSignal={recenterSignal} onFollowingChange={setFollowing} />
       </LeafletMap>
 
       <RacerProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
@@ -171,6 +175,16 @@ function LiveNearbyMap() {
           {isDisabling ? "..." : "Stop sharing"}
         </button>
       </div>
+
+      {!following && (
+        <button
+          onClick={() => setRecenterSignal((n) => n + 1)}
+          aria-label="Recenter on my location"
+          className="glass safe-top fixed right-4 top-20 z-[1000] flex h-11 w-11 items-center justify-center rounded-full text-accent"
+        >
+          <Crosshair size={20} weight="bold" />
+        </button>
+      )}
     </div>
   );
 }
